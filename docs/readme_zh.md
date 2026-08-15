@@ -436,7 +436,7 @@ graph TD
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Felix3322/PotPlayer_ChatGPT_Translate&type=Date)](https://www.star-history.com/#Felix3322/PotPlayer_ChatGPT_Translate&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=Felix3322/PotPlayer_ChatGPT_Translate&type=Date)](https://star-history.dera.page/#Felix3322/PotPlayer_ChatGPT_Translate&Date)
 
 <!-- MARKDOWN LINKS & IMAGES -->
 [stars-shield]: https://img.shields.io/github/stars/Felix3322/PotPlayer_ChatGPT_Translate.svg?style=for-the-badge
