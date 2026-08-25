@@ -861,7 +861,7 @@ std::pair<bool, std::wstring> VerifyApiSettings(const std::wstring& model, const
                         L"\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a test assistant.\"},{\"role\":\"user\",\"content\":\"Hello\"}]}";
     const std::string body_utf8 = WideToUtf8(body);
 
-    HINTERNET session = WinHttpOpen(L"PotPlayerChatGPTTranslateInstaller/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+    HINTERNET session = WinHttpOpen(L"PotPlayerChatGPTTranslateInstaller/1.0", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                     WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!session) {
         return { false, GetLastErrorMessage() };
