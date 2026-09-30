@@ -1,14 +1,19 @@
 param(
     [string]$BuildDir = $PSScriptRoot,
     [string]$ReleaseSuffix = '',
-    [string]$VersionOverride = ''
+    [string]$VersionOverride = '',
+    [string]$OutputDir = ''
 )
 
 $ErrorActionPreference = 'Stop'
 
 $projectRoot = (Resolve-Path (Join-Path $BuildDir '..\..')).Path
 $generatedDir = Join-Path $BuildDir 'generated'
-$outputExe = Join-Path $projectRoot 'releases\latest\installer.exe'
+$outputExe = if ([string]::IsNullOrWhiteSpace($OutputDir)) {
+    Join-Path $projectRoot 'releases\latest\installer.exe'
+} else {
+    Join-Path ([System.IO.Path]::GetFullPath($OutputDir)) 'installer.exe'
+}
 $objFile = Join-Path $BuildDir 'installer.obj'
 $resFile = Join-Path $BuildDir 'installer.res'
 
@@ -39,6 +44,8 @@ New-Item -ItemType Directory -Path (Split-Path -Parent $outputExe) -Force | Out-
 $compileScript = @"
 @echo off
 call "$vcvars"
+if errorlevel 1 exit /b 1
+cd /d "$BuildDir"
 if errorlevel 1 exit /b 1
 rc /nologo /fo "$resFile" "$BuildDir\installer.rc"
 if errorlevel 1 exit /b 1

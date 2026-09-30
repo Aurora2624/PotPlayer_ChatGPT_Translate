@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <!-- The four component GUIDs and UpgradeCode are permanent MSI identities. -->
+  <Package Name="PotPlayer ChatGPT Translate $(var.ReleaseVersion) (MSI)"
+           Manufacturer="Felix3322"
+           Version="$(var.ProductVersion)"
+           ProductCode="$(var.ProductCode)"
+           UpgradeCode="6C47A458-771E-5B7D-9CDF-880CDEC12830"
+           Language="1033" Scope="perMachine" InstallerVersion="500">
+    <MajorUpgrade DowngradeErrorMessage="A newer MSI version is already installed."
+                  Schedule="afterInstallInitialize" />
+    <!-- MSI cannot order SemVer labels. Different prerelease/stable packages
+         sharing one numeric base require uninstall, never silently replace. -->
+    <Upgrade Id="6C47A458-771E-5B7D-9CDF-880CDEC12830">
+      <UpgradeVersion Minimum="$(var.ProductVersion)" Maximum="$(var.ProductVersion)"
+                      IncludeMinimum="yes" IncludeMaximum="yes" OnlyDetect="yes"
+                      Property="SAME_BASE_INSTALLED" />
+    </Upgrade>
+    <Launch Condition="Installed OR NOT SAME_BASE_INSTALLED"
+            Message="Another MSI release with the same numeric version is installed. Back up script edits and uninstall it before switching between prerelease or stable releases of this version." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <SummaryInformation Description="Offline PotPlayer translation plugin payload"
+                        Comments="GPL-3.0; installs both plugin variants. Configure API settings in PotPlayer." />
+    <Icon Id="ProductIcon" SourceFile="$(var.ProjectRoot)\icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/Felix3322/PotPlayer_ChatGPT_Translate" />
+    <Property Id="INSTALLFOLDER" Secure="yes" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT"
+              Value="Both translation plugins are installed. Restart PotPlayer, select a ChatGPT subtitle translator, and configure the endpoint, model and API key in its settings." />
+    <Launch Condition="Installed OR VersionNT64"
+            Message="This MSI package requires 64-bit Windows." />
+
+    <!-- A legitimate conventional location, never blindly created: the native
+         read-only validator requires PotPlayerMini64.exe or PotPlayerMini.exe
+         in the corresponding existing PotPlayer directory before installation. -->
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="DaumFolder" Name="DAUM">
+        <Directory Id="PotPlayerFolder" Name="PotPlayer">
+          <Directory Id="ExtensionsFolder" Name="Extension">
+            <Directory Id="SubtitleFolder" Name="Subtitle">
+              <Directory Id="INSTALLFOLDER" Name="Translate">
+                <Component Id="ContextScript" Guid="1C5EF9FB-C2F8-5B87-A5D8-5F387A11613F" Bitness="always64">
+                  <File Id="ContextScriptFile" Source="$(var.ProjectRoot)\SubtitleTranslate - ChatGPT.as" KeyPath="yes" />
+                </Component>
+                <Component Id="ContextIcon" Guid="9627DCEB-AD03-5D1F-A18B-47BAAE5BC047" Bitness="always64">
+                  <File Id="ContextIconFile" Source="$(var.ProjectRoot)\SubtitleTranslate - ChatGPT.ico" KeyPath="yes" />
+                </Component>
+                <Component Id="WithoutContextScript" Guid="DFFD87D6-13CE-56E8-A327-C04F1DB8951A" Bitness="always64">
+                  <File Id="WithoutContextScriptFile" Source="$(var.ProjectRoot)\SubtitleTranslate - ChatGPT - Without Context.as" KeyPath="yes" />
+                </Component>
+                <Component Id="WithoutContextIcon" Guid="69380DB8-612E-549F-A27D-C9C289DDE688" Bitness="always64">
+                  <File Id="WithoutContextIconFile" Source="$(var.ProjectRoot)\SubtitleTranslate - ChatGPT - Without Context.ico" KeyPath="yes" />
+                </Component>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+    <Feature Id="Plugins" Title="Both ChatGPT translation plugins" Level="1">
+      <ComponentRef Id="ContextScript" />
+      <ComponentRef Id="ContextIcon" />
+      <ComponentRef Id="WithoutContextScript" />
+      <ComponentRef Id="WithoutContextIcon" />
+    </Feature>
+
+    <!-- This DLL only reads paths/Windows Installer registrations and sets MSI
+         properties or an error. Windows Installer itself owns all file changes. -->
+    <Binary Id="TargetValidation" SourceFile="$(var.ValidationDll)" />
+    <CustomAction Id="DetectPotPlayer" BinaryRef="TargetValidation"
+                  DllEntry="DetectPotPlayer" Execute="immediate" Return="check" />
+    <CustomAction Id="ValidatePotPlayer" BinaryRef="TargetValidation"
+                  DllEntry="ValidatePotPlayer" Execute="immediate" Return="check" />
+    <InstallUISequence>
+      <Custom Action="DetectPotPlayer" Before="CostInitialize" Condition="NOT REMOVE~=&quot;ALL&quot;" />
+    </InstallUISequence>
+    <InstallExecuteSequence>
+      <Custom Action="DetectPotPlayer" Before="CostInitialize" Condition="NOT REMOVE~=&quot;ALL&quot;" />
+      <!-- Revalidate after the UI has finalized INSTALLFOLDER, including /qn.
+           Before InstallInitialize: failure cannot remove an older version. -->
+      <Custom Action="ValidatePotPlayer" Before="InstallInitialize" Condition="NOT REMOVE~=&quot;ALL&quot;" />
+    </InstallExecuteSequence>
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+  </Package>
+</Wix>

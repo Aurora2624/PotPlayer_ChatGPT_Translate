@@ -12,3 +12,4 @@ releases/build/generated/
 releases/build/*.spec
 releases/build/installer_preped.py
 installer/generated
+dist/
