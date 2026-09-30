@@ -170,6 +170,24 @@
 
 ---
 
+#### DeepSeek 思考模式（更新後的原始碼腳本）
+
+在 PotPlayer 外掛面板的「模型名稱」中填寫：
+
+```text
+deepseek-flash|https://api.deepseek.com/chat/completions|thinking=disabled
+```
+
+請先備份並替換 `PotPlayer\Extension\Subtitle\Translate` 中對應的更新版 `.as` 腳本，再重新啟動 PotPlayer；舊版安裝器尚未包含此選項，單純追加文字不會生效。
+
+`thinking=disabled` 在 Chat Completions 傳送頂層 `"thinking":{"type":"disabled"}`；語境版本的 Responses 路徑改用 `"reasoning":{"effort":"none"}`。`thinking=enabled` 開啟思考（Responses 使用 `high`）。`thinking=auto` 或重新提交時省略參數，均恢復服務商預設行為；只在驗證成功後儲存。關閉思考無需另外設定 `reasoning_effort`；目前不提供獨立的強度控制。`cache=off` 不會關閉思考。
+
+這是 DeepSeek 官方 API 的格式，其他服務商或中轉介面可能不同。外掛直接傳送 JSON，不使用 Python SDK 的 `extra_body` 包裝。
+
+截至 2026-09-30，官方文件使用 `deepseek-flash` / `deepseek-v4-pro`；舊 `deepseek-chat` / `deepseek-reasoner` 已公告於 2026-07-24 停用。
+
+參考：[思考模式](https://api-docs.deepseek.com/zh-cn/guides/thinking_mode/)、[Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/)、[Responses](https://api-docs.deepseek.com/api/create-response/)、[舊模型停用公告](https://api-docs.deepseek.com/news/news260424/)。
+
 #### 模型填寫範例列表
 
 格式如下：
@@ -186,7 +204,7 @@ OpenAI GPT-5 Nano: gpt-5-nano|https://api.openai.com/v1/chat/completions
 OpenAI GPT-4.1: gpt-4.1|https://api.openai.com/v1/chat/completions
 OpenAI GPT-4.1 Mini: gpt-4.1-mini|https://api.openai.com/v1/chat/completions
 Gemini Flash: gemini-3-flash-preview|https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
-Deepseek: deepseek-chat|https://api.deepseek.com/v1/chat/completions
+DeepSeek Flash: deepseek-flash|https://api.deepseek.com/chat/completions|thinking=disabled
 通義千問: qwen-plus|https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions
 矽基流動: siliconflow-chat|https://api.siliconflow.cn/v1/chat/completions
 文心一言: ernie-4.0-turbo-8k|https://qianfan.baidubce.com/v2/chat/completions
