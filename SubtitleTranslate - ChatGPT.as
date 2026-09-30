@@ -36,10 +36,14 @@ string GetLoginDesc() {
          + "{$CP936=请输入模型名称、API 地址、可选的 nullkey、延迟毫秒和重试模式(0-3)（例如: gpt-5-nano|https://api.openai.com/v1/chat/completions|nullkey|500|retry1）。$}"
          + "{$CP936=\n\n如果安装包已经写入默认配置，在 PotPlayer 面板中没有重新设置之前会继续使用这些配置；一旦在面板中修改，将始终以面板设置为准。$}"
          + "{$CP936=\n\n可选追加 cache=auto 或 cache=off 用于控制上下文缓存模式，auto 在不支持时会自动回退到 chat。$}"
+         + "{$CP950=\n\n支援的服務商可追加 thinking=disabled 關閉思考，thinking=enabled 開啟，thinking=auto 使用預設值。$}"
+         + "{$CP949=\n\n지원하는 API에서 thinking=disabled 로 사고 모드를 끄고, thinking=enabled 로 켜고, thinking=auto 로 기본값을 사용할 수 있습니다.$}"
+         + "{$CP936=\n\n支持的服务商可追加 thinking=disabled 关闭思考，thinking=enabled 开启，thinking=auto 使用服务商默认值。$}"
          + "{$CP0=Please enter the model name, API URL, optional 'nullkey', optional delay in ms, and retry mode 0-3 (e.g., gpt-5-nano|https://api.openai.com/v1/chat/completions|nullkey|500|retry1).$}"
          + "{$CP0=\n\nInstaller defaults will remain in effect until you update the settings in PotPlayer's panel, and any panel changes will always take priority.$}"
          + "{$CP0=\n\nOptionally append cache=auto or cache=off to control context caching. Auto falls back to chat when caching is unsupported.$}"
-         + "{$CP0=\n\nFor OpenAI official API you can also append retention=24h (or cache24h) to extend prompt cache retention. For Gemini official API you can append gcache=cachedContents/... to reuse an explicit cache.$}";
+         + "{$CP0=\n\nFor OpenAI official API you can also append retention=24h (or cache24h) to extend prompt cache retention. For Gemini official API you can append gcache=cachedContents/... to reuse an explicit cache.$}"
+         + "{$CP0=\n\nFor compatible providers, append thinking=disabled, thinking=enabled, or thinking=auto (provider default).$}";
 }
 
 string GetUserText() {
@@ -67,6 +71,7 @@ string GPT_pre_context_subtitle_count = "3"; // number of previous subtitle entr
 string GPT_pre_context_cache_mode = "off"; // auto | off
 string GPT_pre_prompt_cache_retention = ""; // ""(default), in-memory, 24h (OpenAI official only)
 string GPT_pre_gemini_cached_content = ""; // optional cachedContents/... name for Gemini OpenAI-compatible endpoint
+string GPT_pre_thinking_mode = "auto"; // auto (provider default) | enabled | disabled
 string GPT_pre_small_model = "0"; // 0 | 1
 string GPT_pre_check_hallucination = "0"; // 0 | 1
 string GPT_pre_model_token_limits_json = "{}"; // serialized token limit rules (injected by installer)
@@ -83,6 +88,7 @@ string GPT_context_subtitle_count = GPT_pre_context_subtitle_count; // Previous 
 string GPT_context_cache_mode = GPT_pre_context_cache_mode; // auto | off
 string GPT_prompt_cache_retention = GPT_pre_prompt_cache_retention; // "" | in-memory | 24h
 string GPT_gemini_cached_content = GPT_pre_gemini_cached_content; // cachedContents/... (optional)
+string GPT_thinking_mode = GPT_pre_thinking_mode;
 string GPT_small_model = GPT_pre_small_model;
 string GPT_check_hallucination = GPT_pre_check_hallucination;
 string GPT_UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
@@ -131,6 +137,7 @@ void EnsureInstallerDefaultsPersisted() {
     EnsureConfigDefault("gpt_context_cache_mode", GPT_pre_context_cache_mode);
     EnsureConfigDefault("gpt_prompt_cache_retention", GPT_pre_prompt_cache_retention);
     EnsureConfigDefault("gpt_gemini_cached_content", GPT_pre_gemini_cached_content);
+    EnsureConfigDefault("gpt_thinking_mode", GPT_pre_thinking_mode);
     EnsureConfigDefault("gpt_small_model", GPT_pre_small_model);
     EnsureConfigDefault("gpt_check_hallucination", GPT_pre_check_hallucination);
 }
@@ -146,6 +153,7 @@ void RefreshConfiguration() {
     GPT_context_cache_mode = NormalizeCacheMode(LoadInstallerConfig("gpt_context_cache_mode", GPT_pre_context_cache_mode));
     GPT_prompt_cache_retention = NormalizePromptCacheRetention(LoadInstallerConfig("gpt_prompt_cache_retention", GPT_pre_prompt_cache_retention));
     GPT_gemini_cached_content = LoadInstallerConfig("gpt_gemini_cached_content", GPT_pre_gemini_cached_content).Trim();
+    GPT_thinking_mode = GPT_CTX_NormalizeThinkingMode(LoadInstallerConfig("gpt_thinking_mode", GPT_pre_thinking_mode));
     GPT_small_model = LoadInstallerConfig("gpt_small_model", GPT_pre_small_model);
     GPT_check_hallucination = LoadInstallerConfig("gpt_check_hallucination", GPT_pre_check_hallucination);
 }
@@ -344,6 +352,7 @@ string ServerLogin(string User, string Pass) {
     string geminiCachedContentToken = GPT_gemini_cached_content;
     string smallModelToken = "";
     string halluToken = "";
+    string thinkingModeToken = "auto";
     string normalizedCacheMode = GPT_context_cache_mode;
     if (tokens.length() >= 1) {
         userModel = tokens[0];
@@ -391,6 +400,11 @@ string ServerLogin(string User, string Pass) {
             halluToken = "1";
         else if (lowered == "checkhallucination=0" || lowered == "hallucination=0")
             halluToken = "0";
+        else if (lowered.length() >= 9 && lowered.substr(0,9) == "thinking=") {
+            thinkingModeToken = GPT_CTX_NormalizeThinkingMode(lowered.substr(9));
+            if (thinkingModeToken == "")
+                return "Invalid thinking mode. Use thinking=auto, thinking=enabled, or thinking=disabled.\n";
+        }
         else if (customApiUrl == "")
             customApiUrl = t;
     }
@@ -451,7 +465,8 @@ string ServerLogin(string User, string Pass) {
         testPromptCacheKey,
         promptCacheRetentionToken,
         isGemini,
-        geminiCachedContentToken
+        geminiCachedContentToken,
+        thinkingModeToken
     );
     string testResponse = HostUrlGetString(apiUrlLocal, GPT_UserAgent, verifyHeaders, testRequestData);
     if (testResponse != "") {
@@ -463,6 +478,8 @@ string ServerLogin(string User, string Pass) {
                     GPT_api_key = storedApiKey;
                     HostSaveString("gpt_api_key", GPT_api_key);
                     HostSaveString("gpt_selected_model", GPT_selected_model);
+                    GPT_thinking_mode = thinkingModeToken;
+                    HostSaveString("gpt_thinking_mode", GPT_thinking_mode);
                     HostSaveString("gpt_apiUrl", apiUrlLocal);
                     HostSaveString("gpt_delay_ms", GPT_delay_ms);
                     HostSaveString("gpt_retry_mode", GPT_retry_mode);
@@ -502,7 +519,8 @@ string ServerLogin(string User, string Pass) {
             testPromptCacheKey,
             promptCacheRetentionToken,
             correctedIsGemini,
-            geminiCachedContentToken
+            geminiCachedContentToken,
+            thinkingModeToken
         );
         string correctedTestResponse = HostUrlGetString(correctedApiUrl, GPT_UserAgent, verifyHeaders, correctedTestRequestData);
         if (correctedTestResponse != "") {
@@ -515,6 +533,8 @@ string ServerLogin(string User, string Pass) {
                     GPT_api_key = storedApiKey;
                     HostSaveString("gpt_api_key", GPT_api_key);
                     HostSaveString("gpt_selected_model", GPT_selected_model);
+                    GPT_thinking_mode = thinkingModeToken;
+                    HostSaveString("gpt_thinking_mode", GPT_thinking_mode);
                     HostSaveString("gpt_apiUrl", apiUrlLocal);
                     HostSaveString("gpt_delay_ms", GPT_delay_ms);
                     HostSaveString("gpt_retry_mode", GPT_retry_mode);
@@ -600,6 +620,7 @@ void ServerLogout() {
     GPT_context_cache_mode = GPT_pre_context_cache_mode;
     GPT_prompt_cache_retention = GPT_pre_prompt_cache_retention;
     GPT_gemini_cached_content = GPT_pre_gemini_cached_content;
+    GPT_thinking_mode = GPT_pre_thinking_mode;
     GPT_small_model = GPT_pre_small_model;
     GPT_context_cache_disabled_for_session = false;
     GPT_context_cache_disable_key = "";
@@ -612,9 +633,27 @@ void ServerLogout() {
     HostSaveString("gpt_context_cache_mode", GPT_context_cache_mode);
     HostSaveString("gpt_prompt_cache_retention", GPT_prompt_cache_retention);
     HostSaveString("gpt_gemini_cached_content", GPT_gemini_cached_content);
+    HostSaveString("gpt_thinking_mode", GPT_thinking_mode);
     HostSaveString("gpt_small_model", GPT_small_model);
     HostSaveString("gpt_check_hallucination", GPT_check_hallucination);
     HostPrintUTF8("Successfully logged out.\n");
+}
+
+// Explicit opt-in: never send provider-specific thinking fields by default.
+string GPT_CTX_NormalizeThinkingMode(const string &in mode) {
+    string normalized = string(mode.Trim()).MakeLower();
+    if (normalized == "auto" || normalized == "enabled" || normalized == "disabled")
+        return normalized;
+    return "";
+}
+
+string GPT_CTX_BuildThinkingFields(const string &in mode, bool responses = false) {
+    string normalized = GPT_CTX_NormalizeThinkingMode(mode);
+    if (normalized != "enabled" && normalized != "disabled")
+        return "";
+    if (responses)
+        return ",\"reasoning\":{\"effort\":\"" + (normalized == "disabled" ? "none" : "high") + "\"}";
+    return ",\"thinking\":{\"type\":\"" + normalized + "\"}";
 }
 
 // JSON String Escape Function
@@ -757,14 +796,15 @@ string Translate(string Text, string &in SrcLang, string &in DstLang) {
         promptCacheKey,
         promptCacheRetention,
         isGeminiApi,
-        GPT_gemini_cached_content
+        GPT_gemini_cached_content,
+        GPT_thinking_mode
     );
 
     string headers = BuildAuthHeaders(GPT_api_key);
     int delayInt = ParseInt(GPT_delay_ms);
     int retryModeInt = ParseInt(GPT_retry_mode);
 
-    string cacheSessionKey = GPT_context_cache_mode + "|" + GPT_apiUrl + "|" + GPT_selected_model + "|" + promptCacheRetention + "|" + GPT_gemini_cached_content;
+    string cacheSessionKey = GPT_context_cache_mode + "|" + GPT_apiUrl + "|" + GPT_selected_model + "|" + promptCacheRetention + "|" + GPT_gemini_cached_content + "|" + GPT_thinking_mode;
     if (cacheSessionKey != GPT_context_cache_disable_key)
         GPT_context_cache_disabled_for_session = false;
     GPT_context_cache_disable_key = cacheSessionKey;
@@ -865,7 +905,8 @@ string Translate(string Text, string &in SrcLang, string &in DstLang) {
                     promptCacheKey,
                     promptCacheRetention,
                     isGeminiApi,
-                    GPT_gemini_cached_content
+                    GPT_gemini_cached_content,
+                    GPT_thinking_mode
                 );
                 HostPrintUTF8("Prompt cache control fields are unsupported on this endpoint. Retrying without them.\n");
             }
@@ -1008,12 +1049,15 @@ string BuildChatPayload(
     const string &in promptCacheKey,
     const string &in promptCacheRetention,
     bool includeGeminiCachedContent,
-    const string &in geminiCachedContent
+    const string &in geminiCachedContent,
+    const string &in thinkingMode
 ) {
     string escapedModel = JsonEscape(modelName);
     string escapedSystem = JsonEscape(systemMsg);
     string escapedUser = JsonEscape(userMsg);
     string payload = "{\"model\":\"" + escapedModel + "\"";
+
+    payload += GPT_CTX_BuildThinkingFields(thinkingMode);
 
     string cacheKey = promptCacheKey.Trim();
     if (includePromptCacheControls && cacheKey != "")
@@ -1108,11 +1152,13 @@ string BuildResponsesPayload(
     const string &in systemMsg,
     const string &in userMsg,
     const string &in promptCacheKey,
-    const string &in promptCacheRetention
+    const string &in promptCacheRetention,
+    const string &in thinkingMode
 ) {
     string escapedSystem = JsonEscape(systemMsg);
     string escapedUser = JsonEscape(userMsg);
     string payload = "{\"model\":\"" + JsonEscape(modelName) + "\"";
+    payload += GPT_CTX_BuildThinkingFields(thinkingMode, true);
     string cacheKey = promptCacheKey.Trim();
     if (cacheKey != "")
         payload += ",\"prompt_cache_key\":\"" + JsonEscape(cacheKey) + "\"";
@@ -1166,7 +1212,7 @@ string TranslateWithResponses(
     const string &in promptCacheRetention,
     string &out failureReason
 ) {
-    string requestData = BuildResponsesPayload(modelName, systemMsg, userMsg, promptCacheKey, promptCacheRetention);
+    string requestData = BuildResponsesPayload(modelName, systemMsg, userMsg, promptCacheKey, promptCacheRetention, GPT_thinking_mode);
     string response = ExecuteSimple(responsesUrl, headers, requestData);
     if (response == "") {
         failureReason = "No response from Responses endpoint.";

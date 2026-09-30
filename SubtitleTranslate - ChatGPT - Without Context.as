@@ -34,8 +34,12 @@ string GetLoginDesc() {
          + "{$CP950=\n\n如果安裝包已寫入預設配置，在 PotPlayer 面板中未重新設定之前會沿用這些配置；一旦在面板中調整，將始終以面板設定為準。$}"
          + "{$CP936=请输入模型名称、API 地址、可选的 nullkey、延迟毫秒和重试模式(0-3)（例如: gpt-5-mini|https://api.openai.com/v1/chat/completions|nullkey|500|retry1）。$}"
          + "{$CP936=\n\n如果安装包已经写入默认配置，在 PotPlayer 面板中没有重新设置之前会继续使用这些配置；一旦在面板中修改，将始终以面板设置为准。$}"
+         + "{$CP950=\n\n支援的服務商可追加 thinking=disabled 關閉思考，thinking=enabled 開啟，thinking=auto 使用預設值。$}"
+         + "{$CP949=\n\n지원하는 API에서 thinking=disabled 로 사고 모드를 끄고, thinking=enabled 로 켜고, thinking=auto 로 기본값을 사용할 수 있습니다.$}"
+         + "{$CP936=\n\n支持的服务商可追加 thinking=disabled 关闭思考，thinking=enabled 开启，thinking=auto 使用服务商默认值。$}"
          + "{$CP0=Please enter the model name, API URL, optional 'nullkey', optional delay in ms, and retry mode 0-3 (e.g., gpt-5-mini|https://api.openai.com/v1/chat/completions|nullkey|500|retry1).$}"
-         + "{$CP0=\n\nInstaller defaults will remain in effect until you update the settings in PotPlayer's panel, and any panel changes will always take priority.$}";
+         + "{$CP0=\n\nInstaller defaults will remain in effect until you update the settings in PotPlayer's panel, and any panel changes will always take priority.$}"
+         + "{$CP0=\n\nFor compatible providers, append thinking=disabled, thinking=enabled, or thinking=auto (provider default).$}";
 }
 
 string GetUserText() {
@@ -62,6 +66,7 @@ string GPT_pre_selected_model = "gpt-5-mini"; // will be replaced during install
 string GPT_pre_apiUrl = "https://api.openai.com/v1/chat/completions"; // will be replaced during installation
 string GPT_pre_delay_ms = "0"; // will be replaced during installation
 string GPT_pre_retry_mode = "0"; // will be replaced during installation
+string GPT_pre_thinking_mode = "auto"; // auto (provider default) | enabled | disabled
 string GPT_pre_small_model = "0"; // 0 | 1
 string GPT_pre_check_hallucination = "0"; // 0 | 1
 string GPT_pre_model_token_limits_json = "{}"; // serialized token limit rules (injected by installer)
@@ -71,6 +76,7 @@ string GPT_selected_model = GPT_pre_selected_model; // Default model
 string GPT_apiUrl = GPT_pre_apiUrl; // Default API URL
 string GPT_delay_ms = GPT_pre_delay_ms; // Request delay in ms
 string GPT_retry_mode = GPT_pre_retry_mode; // Auto retry mode
+string GPT_thinking_mode = GPT_pre_thinking_mode;
 string GPT_small_model = GPT_pre_small_model;
 string GPT_check_hallucination = GPT_pre_check_hallucination;
 string GPT_context_cache_mode = "off"; // Always off for WC version, but kept for compatibility logic
@@ -113,6 +119,7 @@ void EnsureInstallerDefaultsPersisted() {
     EnsureConfigDefault("wc_apiUrl", GPT_pre_apiUrl);
     EnsureConfigDefault("wc_delay_ms", GPT_pre_delay_ms);
     EnsureConfigDefault("wc_retry_mode", GPT_pre_retry_mode);
+    EnsureConfigDefault("wc_thinking_mode", GPT_pre_thinking_mode);
     EnsureConfigDefault("wc_small_model", GPT_pre_small_model);
     EnsureConfigDefault("wc_check_hallucination", GPT_pre_check_hallucination);
 }
@@ -124,6 +131,7 @@ void RefreshConfiguration() {
     GPT_apiUrl = LoadInstallerConfig("wc_apiUrl", GPT_pre_apiUrl, "gpt_apiUrl");
     GPT_delay_ms = LoadInstallerConfig("wc_delay_ms", GPT_pre_delay_ms, "gpt_delay_ms");
     GPT_retry_mode = LoadInstallerConfig("wc_retry_mode", GPT_pre_retry_mode, "gpt_retry_mode");
+    GPT_thinking_mode = GPT_WC_NormalizeThinkingMode(LoadInstallerConfig("wc_thinking_mode", GPT_pre_thinking_mode));
     GPT_small_model = LoadInstallerConfig("wc_small_model", GPT_pre_small_model, "gpt_small_model");
     GPT_check_hallucination = LoadInstallerConfig("wc_check_hallucination", GPT_pre_check_hallucination, "gpt_check_hallucination");
 }
@@ -281,6 +289,7 @@ string BuildAuthHeaders(const string &in key) {
 
 // API Key and API Base verification process
 string ServerLogin(string User, string Pass) {
+    RefreshConfiguration();
     string errorAccum = "";
     User = User.Trim();
     Pass = Pass.Trim();
@@ -302,6 +311,7 @@ string ServerLogin(string User, string Pass) {
     string cacheToken = "";
     string smallModelToken = "";
     string halluToken = "";
+    string thinkingModeToken = "auto";
     string normalizedCacheMode = GPT_context_cache_mode;
     if (tokens.length() >= 1) {
         userModel = tokens[0];
@@ -323,6 +333,11 @@ string ServerLogin(string User, string Pass) {
             halluToken = "1";
         else if (lowered == "checkhallucination=0" || lowered == "hallucination=0")
             halluToken = "0";
+        else if (lowered.length() >= 9 && lowered.substr(0,9) == "thinking=") {
+            thinkingModeToken = GPT_WC_NormalizeThinkingMode(lowered.substr(9));
+            if (thinkingModeToken == "")
+                return "Invalid thinking mode. Use thinking=auto, thinking=enabled, or thinking=disabled.\n";
+        }
         else if (customApiUrl == "")
             customApiUrl = t;
     }
@@ -366,11 +381,7 @@ string ServerLogin(string User, string Pass) {
     string verifyHeaders = BuildAuthHeaders(Pass);
     string testSystemMsg = "You are a test assistant.";
     string testUserMsg = "Hello";
-    string escapedSystemMsg = JsonEscape(testSystemMsg);
-    string escapedUserMsg = JsonEscape(testUserMsg);
-    string testRequestData = "{\"model\":\"" + userModel + "\"," 
-                             "\"messages\":[{\"role\":\"system\",\"content\":\"" + escapedSystemMsg + "\"}," 
-                             "{\"role\":\"user\",\"content\":\"" + escapedUserMsg + "\"}]}";
+    string testRequestData = GPT_WC_BuildChatPayload(userModel, testSystemMsg, testUserMsg, thinkingModeToken);
     string testResponse = HostUrlGetString(apiUrlLocal, GPT_UserAgent, verifyHeaders, testRequestData);
     if (testResponse != "") {
         JsonReader testReader;
@@ -381,6 +392,8 @@ string ServerLogin(string User, string Pass) {
                 GPT_api_key = storedApiKey;
                 HostSaveString("wc_api_key", GPT_api_key);
                 HostSaveString("wc_selected_model", GPT_selected_model);
+                GPT_thinking_mode = thinkingModeToken;
+                HostSaveString("wc_thinking_mode", GPT_thinking_mode);
                 HostSaveString("wc_apiUrl", apiUrlLocal);
                 HostSaveString("wc_delay_ms", GPT_delay_ms);
                 HostSaveString("wc_retry_mode", GPT_retry_mode);
@@ -412,6 +425,8 @@ string ServerLogin(string User, string Pass) {
                     GPT_api_key = storedApiKey;
                     HostSaveString("wc_api_key", GPT_api_key);
                     HostSaveString("wc_selected_model", GPT_selected_model);
+                    GPT_thinking_mode = thinkingModeToken;
+                    HostSaveString("wc_thinking_mode", GPT_thinking_mode);
                     HostSaveString("wc_apiUrl", apiUrlLocal);
                     HostSaveString("wc_delay_ms", GPT_delay_ms);
                 HostSaveString("wc_retry_mode", GPT_retry_mode);
@@ -484,6 +499,7 @@ void ServerLogout() {
     GPT_apiUrl = GPT_pre_apiUrl;
     GPT_delay_ms = GPT_pre_delay_ms;
     GPT_retry_mode = GPT_pre_retry_mode;
+    GPT_thinking_mode = GPT_pre_thinking_mode;
     GPT_small_model = GPT_pre_small_model;
     GPT_check_hallucination = GPT_pre_check_hallucination;
     HostSaveString("wc_api_key", "");
@@ -491,9 +507,27 @@ void ServerLogout() {
     HostSaveString("wc_apiUrl", GPT_apiUrl);
     HostSaveString("wc_delay_ms", GPT_delay_ms);
     HostSaveString("wc_retry_mode", GPT_retry_mode);
+    HostSaveString("wc_thinking_mode", GPT_thinking_mode);
     HostSaveString("wc_small_model", GPT_small_model);
     HostSaveString("wc_check_hallucination", GPT_check_hallucination);
     HostPrintUTF8("Successfully logged out.\n");
+}
+
+// Explicit opt-in: never send provider-specific thinking fields by default.
+string GPT_WC_NormalizeThinkingMode(const string &in mode) {
+    string normalized = string(mode.Trim()).MakeLower();
+    if (normalized == "auto" || normalized == "enabled" || normalized == "disabled")
+        return normalized;
+    return "";
+}
+
+string GPT_WC_BuildThinkingFields(const string &in mode, bool responses = false) {
+    string normalized = GPT_WC_NormalizeThinkingMode(mode);
+    if (normalized != "enabled" && normalized != "disabled")
+        return "";
+    if (responses)
+        return ",\"reasoning\":{\"effort\":\"" + (normalized == "disabled" ? "none" : "high") + "\"}";
+    return ",\"thinking\":{\"type\":\"" + normalized + "\"}";
 }
 
 // JSON String Escape Function
@@ -628,12 +662,7 @@ string Translate(string Text, string &in SrcLang, string &in DstLang) {
         userMsg = Text;
     }
 
-    string escapedSystemMsg = JsonEscape(systemMsg);
-    string escapedUserMsg = JsonEscape(userMsg);
-
-    string requestData = "{\"model\":\"" + GPT_selected_model + "\"," 
-                         "\"messages\":[{\"role\":\"system\",\"content\":\"" + escapedSystemMsg + "\"}," 
-                         "{\"role\":\"user\",\"content\":\"" + escapedUserMsg + "\"}]}";
+    string requestData = GPT_WC_BuildChatPayload(GPT_selected_model, systemMsg, userMsg, GPT_thinking_mode);
 
     string headers = BuildAuthHeaders(GPT_api_key);
     int delayInt = ParseInt(GPT_delay_ms);
@@ -742,4 +771,18 @@ void OnInitialize() {
 // Plugin Finalization
 void OnFinalize() {
     HostPrintUTF8("ChatGPT translation plugin unloaded.\n");
+}
+
+// Share serialization between verification and subtitle translation.
+string GPT_WC_BuildChatPayload(
+    const string &in modelName,
+    const string &in systemMsg,
+    const string &in userMsg,
+    const string &in thinkingMode
+) {
+    string payload = "{\"model\":\"" + JsonEscape(modelName) + "\"";
+    payload += GPT_WC_BuildThinkingFields(thinkingMode);
+    payload += ",\"messages\":[{\"role\":\"system\",\"content\":\"" + JsonEscape(systemMsg) + "\"},";
+    payload += "{\"role\":\"user\",\"content\":\"" + JsonEscape(userMsg) + "\"}]}";
+    return payload;
 }

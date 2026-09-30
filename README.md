@@ -291,7 +291,7 @@ You can append optional parameters after the model and API URL. Each option is s
 Full format:
 
 ```text
-ModelName|API Base URL|nullkey|delay_ms|retryN|context=3|cache=auto/off|smallmodel=0/1|checkhallucination=0/1
+ModelName|API Base URL|nullkey|delay_ms|retryN|context=3|cache=auto/off|smallmodel=0/1|checkhallucination=0/1|thinking=auto/enabled/disabled
 ```
 
 Available options:
@@ -307,6 +307,8 @@ Available options:
 | `context=3` | Context version only. Number of recent subtitle entries to send as context. Use `0` to send no previous subtitles. |
 | `cache=auto` | Enable context cache mode when available. Context version only. Falls back to normal chat mode if unsupported. |
 | `cache=off` | Disable context cache mode. |
+| `thinking=auto` | Provider default; omit thinking parameters (default). |
+| `thinking=disabled` / `thinking=enabled` | Opt-in thinking switch for APIs supporting the DeepSeek request format. Applies to verification and translation in both variants. |
 | `smallmodel=0` | Disable small-model prompt mode. |
 | `smallmodel=1` | Enable prompt mode optimized for smaller models. |
 | `checkhallucination=0` | Disable hallucination-length check. |
@@ -317,6 +319,27 @@ Example with several options:
 ```text
 gpt-4.1-nano|https://api.openai.com/v1/chat/completions|nullkey|500|retry1|context=3|cache=auto|smallmodel=1|checkhallucination=1
 ```
+
+### DeepSeek Thinking Mode (source scripts)
+
+The updated source scripts accept `thinking=disabled` in PotPlayer's **Model Name** field:
+
+```text
+deepseek-flash|https://api.deepseek.com/chat/completions|thinking=disabled
+```
+
+This option requires the updated `.as` script; older release installers do not gain it by adding the text alone. Back up and replace the corresponding script in `PotPlayer\Extension\Subtitle\Translate`, restart PotPlayer, and configure it in PotPlayer's plugin panel. The installer UI does not configure this option.
+
+- Chat Completions requests include top-level `"thinking":{"type":"disabled"}`. The plugin sends raw JSON, so **do not** wrap it in `extra_body` (that wrapper is for the Python OpenAI SDK).
+- The context variant's optional Responses path uses `"reasoning":{"effort":"none"}` instead. `thinking=enabled` uses `high` on that path.
+- `thinking=auto`, or submitting a model setting without this option, omits these fields and restores the provider default. A successful verification saves the choice; failed verification leaves the saved choice unchanged.
+- `reasoning_effort` controls thinking effort. Disabling thinking does not require an additional effort setting. This patch does not add a separate effort control.
+- These request formats are documented for the official DeepSeek API. Other providers and gateways may require different parameters; `thinking=disabled` is not a universal OpenAI-compatible option. Keep `auto` for those providers unless their documentation confirms support.
+- `cache=off` only controls the plugin's Responses/cache path; it does not disable model thinking.
+
+As of September 30, 2026, the DeepSeek docs list `deepseek-flash` and `deepseek-v4-pro`. The legacy `deepseek-chat` / `deepseek-reasoner` aliases were scheduled for retirement on July 24, 2026; do not rely on changing to those names to disable thinking.
+
+Sources: [Thinking mode](https://api-docs.deepseek.com/guides/thinking_mode/), [Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/), [Responses](https://api-docs.deepseek.com/api/create-response/), [legacy model retirement](https://api-docs.deepseek.com/news/news260424/).
 
 ### API Key
 
@@ -364,7 +387,7 @@ OpenAI GPT-3.5 Turbo: gpt-3.5-turbo|https://api.openai.com/v1/chat/completions
 ```text
 Gemini Flash: gemini-3-flash-preview|https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
 Gemini 2.0 Flash: gemini-2.0-flash|https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
-DeepSeek Chat: deepseek-chat|https://api.deepseek.com/v1/chat/completions
+DeepSeek Flash: deepseek-flash|https://api.deepseek.com/chat/completions|thinking=disabled
 Tongyi Qianwen: qwen-plus|https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions
 SiliconFlow: siliconflow-chat|https://api.siliconflow.cn/v1/chat/completions
 ERNIE Bot: ernie-4.0-turbo-8k|https://qianfan.baidubce.com/v2/chat/completions

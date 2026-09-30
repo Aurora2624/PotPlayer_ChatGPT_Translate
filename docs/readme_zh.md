@@ -183,6 +183,27 @@
 
 ---
 
+#### DeepSeek 思考模式（更新后的源码脚本）
+
+在 PotPlayer 插件面板的“模型名称”中填写：
+
+```text
+deepseek-flash|https://api.deepseek.com/chat/completions|thinking=disabled
+```
+
+此参数需要更新后的 `.as` 脚本。请先备份并替换 `PotPlayer\Extension\Subtitle\Translate` 中对应的脚本，重启 PotPlayer 后在插件面板设置；仅在旧版安装包中追加文字不会生效，安装器界面暂不配置此选项。
+
+- `thinking=disabled`：Chat Completions 请求添加顶层 `"thinking":{"type":"disabled"}`；上下文版本的 Responses 路径使用 `"reasoning":{"effort":"none"}`
+- `thinking=enabled`：开启思考；Responses 路径使用 `high`
+- `thinking=auto` 或重新提交时不填写此参数：不发送上述字段，恢复服务商默认行为；只有验证成功才保存，失败不会覆盖已保存的思考设置
+- `reasoning_effort` 用于控制思考强度，关闭思考不需要再设置一个 effort 参数；当前补丁不提供单独的强度控制
+- 插件直接发送 JSON，不需要 Python SDK 的 `extra_body` 包装；`cache=off` 不会关闭思考
+- 上述格式依据 DeepSeek 官方 API 文档，第三方服务商或中转接口可能不同，请勿假定所有 OpenAI 兼容接口均支持此参数
+
+截至 2026-09-30，官方文档列出的模型为 `deepseek-flash` / `deepseek-v4-pro`；旧 `deepseek-chat` / `deepseek-reasoner` 已公告于 2026-07-24 停用，不建议再用切换旧模型名的方式关闭思考。
+
+参考：[思考模式](https://api-docs.deepseek.com/zh-cn/guides/thinking_mode/)、[Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/)、[Responses](https://api-docs.deepseek.com/api/create-response/)、[旧模型停用公告](https://api-docs.deepseek.com/news/news260424/)。
+
 #### 模型填写示例列表
 
 使用格式如下：
@@ -199,7 +220,7 @@ OpenAI GPT-5 Nano: gpt-5-nano|https://api.openai.com/v1/chat/completions
 OpenAI GPT-4.1: gpt-4.1|https://api.openai.com/v1/chat/completions
 OpenAI GPT-4.1 Mini: gpt-4.1-mini|https://api.openai.com/v1/chat/completions
 Gemini Flash: gemini-3-flash-preview|https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
-Deepseek: deepseek-chat|https://api.deepseek.com/v1/chat/completions
+DeepSeek Flash: deepseek-flash|https://api.deepseek.com/chat/completions|thinking=disabled
 通义千问: qwen-plus|https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions
 硅基流动: siliconflow-chat|https://api.siliconflow.cn/v1/chat/completions
 文心一言: ernie-4.0-turbo-8k|https://qianfan.baidubce.com/v2/chat/completions
