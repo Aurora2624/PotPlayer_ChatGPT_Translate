@@ -35,7 +35,7 @@ if (-not [System.IO.Path]::IsPathRooted($OutputDir) -or $OutputDir -notmatch '^(
 
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $outputPath = [System.IO.Path]::GetFullPath($OutputDir)
-$python = (Get-Command python -CommandType Application -ErrorAction Stop).Source
+$python = @(Get-Command python -CommandType Application -ErrorAction Stop)[0].Source
 
 # Use Python's native path/subprocess APIs for argument quoting, UTF-8 source,
 # temporary-directory cleanup, and exact inspection of the finished CArchive.
