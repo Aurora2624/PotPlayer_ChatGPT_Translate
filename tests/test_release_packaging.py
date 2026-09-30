@@ -17,7 +17,7 @@ class PackagingTests(unittest.TestCase):
     def test_version_validation(self):
         self.assertEqual(package.validate_version('v1.9.5'), '1.9.5')
         self.assertEqual(package.validate_version('1.9.5-rc.1'), '1.9.5-rc.1')
-        for bad in ('', '../1.9.5', 'v1.9', 'v1.9.5\n', 'v1.9.5/evil', 'v256.0.0', 'v1.0.65536', 'v1.9.5"'):
+        for bad in ('', '../1.9.5', 'v1.9', 'v1.9.5\n', 'v1.9.5/evil', 'v256.0.0', 'v1.0.65536', 'v1.9.5"', 'v1.9.5+build.1', 'v1.9.5-rc.01'):
             with self.subTest(version=bad), self.assertRaises(ValueError):
                 package.validate_version(bad)
 

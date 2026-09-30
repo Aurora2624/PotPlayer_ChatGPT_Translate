@@ -5,7 +5,9 @@ installer set on pull requests, pushes to `master`, manual runs, and **every tag
 push**. A tag must be a release version such as `v1.9.5`, `1.9.5` or `v1.9.5-rc.1`.
 Invalid/non-version tags fail early rather than publishing mislabeled packages.
 Windows Installer restricts the numeric components to `255.255.65535`. The full
-release version remains visible, but MSI compares only the numeric core. Uninstall
+release version remains visible, but MSI compares only the numeric core. Build
+metadata (`+...`) and numeric prerelease identifiers with leading zeros are rejected.
+Uninstall
 the MSI before switching prerelease/stable builds of the same numeric version.
 Tags containing a prerelease suffix publish a GitHub prerelease, not the latest
 stable release.
@@ -30,12 +32,14 @@ settings before changing installer formats. See [MSI details](../installer/msi/R
 
 ## Build locally on Windows
 
-Requirements: Windows x64, Python **3.12 x64**, Visual Studio 2022 C++ build tools
+Requirements: Windows x64, PowerShell **7**, Python **3.12 x64**, Visual Studio 2022 C++ build tools
 and Windows SDK, Inno Setup 6.5+, and .NET SDK 8+. WiX 5.0.2 and its matching UI
 extension are downloaded from the official NuGet feed into a temporary local tool
 folder by the MSI build; no global WiX installation is changed.
 
 ```powershell
+python -m venv .venv
+./.venv/Scripts/Activate.ps1
 python -m pip install -r releases/build/requirements-build.txt
 ./scripts/build_release.ps1 -Version v1.9.5 -OutputDir C:\build\potplayer-v1.9.5
 ```
@@ -89,6 +93,9 @@ normally trigger a new workflow.
 2.38.0 and checks 222 mocked-host runtime assertions / 50 request JSON payloads.
 `tests/test_release_packaging.py` checks exact version stamping, source isolation,
 ZIP membership, reproducible ZIP bytes, checksums and fail-fast missing assets.
-Windows CI proves compilation and embedded payload integrity, not a complete
+Windows CI also exercises MSI rejection of invalid/unmanaged targets, install,
+payload hashes, repair and uninstall in a synthetic PotPlayer-folder fixture,
+checking that unrelated files survive. This proves package lifecycle behavior,
+compilation and embedded payload integrity, not a complete
 interactive installation into a real PotPlayer instance or provider acceptance.
 API calls are not made by these tests. Tool versions are recorded in each run.

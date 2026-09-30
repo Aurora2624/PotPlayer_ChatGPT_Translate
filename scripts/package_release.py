@@ -32,6 +32,10 @@ def validate_version(version: str) -> str:
         raise ValueError('Use a release version such as v1.9.5 or v1.9.5-rc.1 (no spaces or path separators)')
     if any(int(v) > limit for v, limit in zip(match.groups()[:3], (255, 255, 65535))):
         raise ValueError('MSI version components must be <=255.255.65535')
+    if match.group(5):
+        raise ValueError('MSI releases do not support +build metadata; use a distinct numeric version or -prerelease label')
+    if match.group(4) and any(part.isdigit() and len(part) > 1 and part.startswith('0') for part in match.group(4).split('.')):
+        raise ValueError('Numeric prerelease identifiers cannot have leading zeros')
     return version.removeprefix('v')
 
 
