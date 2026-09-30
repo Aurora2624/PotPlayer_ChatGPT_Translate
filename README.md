@@ -712,3 +712,7 @@ GitHub:
 
 [license-shield]: https://img.shields.io/github/license/Felix3322/PotPlayer_ChatGPT_Translate.svg?style=for-the-badge
 [license-url]: https://github.com/Felix3322/PotPlayer_ChatGPT_Translate/blob/master/LICENSE
+
+## Building release packages
+
+See [release build and tag CI instructions](docs/BUILDING.md) for native C++, Python, Inno Setup, MSI and manual ZIP packages. Every numeric version tag triggers testing, Windows builds and automatic GitHub Release publication.

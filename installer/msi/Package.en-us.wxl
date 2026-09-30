@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="en-US">
+  <String Id="WelcomeDlgDescription" Value="Installs both ChatGPT subtitle translation plugins. Close PotPlayer first. API settings are configured in PotPlayer after installation." />
+  <String Id="InstallDirDlgDescription" Value="Choose your installed PotPlayer's Extension\Subtitle\Translate folder. PotPlayer must already be installed." />
+  <String Id="InstallDirDlgFolderLabel" Value="PotPlayer translation plugin folder:" />
+</WixLocalization>

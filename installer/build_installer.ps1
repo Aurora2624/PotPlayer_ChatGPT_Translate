@@ -1,7 +1,8 @@
 param(
     [string]$BuildDir = $PSScriptRoot,
     [string]$ReleaseSuffix = '',
-    [string]$VersionOverride = ''
+    [string]$VersionOverride = '',
+    [string]$OutputDir = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,7 +28,13 @@ function Get-IsccPath {
 }
 
 $projectRoot = (Resolve-Path (Join-Path $BuildDir '..')).Path
-$outputExe = Join-Path $projectRoot 'releases\latest\installer.exe'
+$outputDirectory = if ([string]::IsNullOrWhiteSpace($OutputDir)) {
+    Join-Path $projectRoot 'releases\latest'
+} else {
+    [System.IO.Path]::GetFullPath($OutputDir)
+}
+$outputBaseName = if ([string]::IsNullOrWhiteSpace($OutputDir)) { 'installer' } else { 'installer-inno' }
+$outputExe = Join-Path $outputDirectory ($outputBaseName + '.exe')
 
 Write-Host 'Preparing generated Inno installer data...'
 $version = & (Join-Path $BuildDir 'prepare_installer.ps1') -ProjectRoot $projectRoot -BuildDir $BuildDir -ReleaseSuffix $ReleaseSuffix -VersionOverride $VersionOverride -PassThruVersion
@@ -43,7 +50,7 @@ New-Item -ItemType Directory -Path (Split-Path -Parent $outputExe) -Force | Out-
 
 $scriptPath = Join-Path $BuildDir 'installer.iss'
 Write-Host 'Building Inno Setup installer...'
-& $iscc '/Qp' ("/DPluginVersion=$version") $scriptPath
+& $iscc '/Qp' ("/DPluginVersion=$version") ("/O$outputDirectory") ("/F$outputBaseName") $scriptPath
 if ($LASTEXITCODE -ne 0) {
     throw 'Inno Setup build failed.'
 }
